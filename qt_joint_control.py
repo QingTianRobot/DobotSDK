@@ -368,9 +368,15 @@ class JointControlWindow(QMainWindow):
             self.dashboard = DobotApiDashboard(ip, int(self.dashboard_port.value()))
             self.move = DobotApiMove(ip, int(self.move_port.value()))
         except Exception as exc:
+            for client in (self.dashboard, self.move):
+                if client is not None:
+                    try:
+                        client.close()
+                    except Exception:
+                        pass
             self.dashboard = None
             self.move = None
-            QMessageBox.critical(self, "Connection Failed", str(exc))
+            QMessageBox.critical(self, "Connection Failed", self._error_text(exc))
             return
 
         self.feedback_thread = FeedbackThread(ip, int(self.feedback_port.value()), self)
@@ -434,6 +440,13 @@ class JointControlWindow(QMainWindow):
 
     def _on_feedback_error(self, message: str) -> None:
         self._append_log(f"Feedback error: {message}")
+        QMessageBox.critical(self, "Connection Failed", self._error_text(message))
+
+    def _error_text(self, error) -> str:
+        text = str(error)
+        if "网络超时" in text:
+            return "网络超时"
+        return text
 
     def _sync_targets_to_actual(self) -> None:
         if self.latest_actual is None:

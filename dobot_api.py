@@ -9,6 +9,8 @@ import time
 
 alarmControllerFile = "files/alarm_controller.json"
 alarmServoFile = "files/alarm_servo.json"
+CONNECT_TIMEOUT_SECONDS = 3.0
+NETWORK_TIMEOUT_MESSAGE = "网络超时"
 
 # Port Feedback
 MyType = np.dtype([(
@@ -145,13 +147,25 @@ class DobotApi:
             self.text_log = args[0]
 
         if self.port == 29999 or self.port == 30003 or self.port == 30004:
+            sock = None
             try:
-                self.socket_dobot = socket.socket()
-                self.socket_dobot.connect((self.ip, self.port))
-            except socket.error:
-                print(socket.error)
+                sock = socket.socket()
+                sock.settimeout(CONNECT_TIMEOUT_SECONDS)
+                sock.connect((self.ip, self.port))
+                sock.settimeout(None)
+                self.socket_dobot = sock
+            except (socket.timeout, TimeoutError):
+                if sock is not None:
+                    sock.close()
+                self.socket_dobot = 0
+                raise TimeoutError(NETWORK_TIMEOUT_MESSAGE) from None
+            except socket.error as exc:
+                if sock is not None:
+                    sock.close()
+                self.socket_dobot = 0
+                print(exc)
                 raise Exception(
-                    f"Unable to set socket connection use port {self.port} !", socket.error)
+                    f"Unable to set socket connection use port {self.port} !", exc)
         else:
             raise Exception(
                 f"Connect to dashboard server need use port {self.port} !")
